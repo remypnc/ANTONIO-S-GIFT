@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Le Musée du GOAT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink: #f2f2f2;
+    --void: #121212;
+    --pixel: 'Press Start 2P', monospace;
+    --body: 'VT323', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; background: #000; }
+  body { font-family: var(--body); color: var(--ink); user-select: none; -webkit-user-select: none; }
+  canvas#game-canvas { position: fixed; inset: 0; display: block; }
+
+  /* ---------------- TITRE (centré en haut) ---------------- */
+  #title {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 20;
+    font-family: var(--pixel); font-size: 12px; letter-spacing: 1.5px; color: #fff;
+    background: rgba(0,0,0,0.5); border: 2px solid rgba(255,255,255,0.16);
+    padding: 9px 16px; pointer-events: none; text-align: center; max-width: 60vw;
+  }
+  /* ---------------- HUD (haut-droite : minimap + infos) ---------------- */
+  #hud {
+    position: fixed; top: 16px; right: 16px; z-index: 20;
+    display: flex; flex-direction: column; gap: 6px; align-items: stretch;
+    font-family: var(--pixel); font-size: 10px; letter-spacing: 1px;
+    color: #e8e8e8; pointer-events: none;
+    background: rgba(0,0,0,0.55); border: 2px solid rgba(255,255,255,0.16); padding: 8px;
+  }
+  #hud #mm-floor { font-size: 9px; color: #9fe6ff; text-align: center; letter-spacing: 1px; }
+  #hud .hud-stats { display: flex; align-items: center; justify-content: center; gap: 22px; }
+  #hud .stat { display: flex; align-items: center; gap: 7px; }
+  #hud .gicon { color: #f4cf6a; display: flex; align-items: center; }
+  #hud .gicon-glasses svg { width: 22px; height: 11px; display: block; }
+  #hud .gicon-glasses svg path, #hud .gicon-glasses svg rect { stroke: #f4cf6a; }
+  #hud .gicon-euro { font-size: 11px; }
+  #hud .v { color: #fff; }
+  #minimap { display: block; width: 188px; height: 132px; background: rgba(0,0,0,0.4); image-rendering: pixelated; }
+
+  /* ---------------- CONTROLS (touches clavier) ---------------- */
+  #controls {
+    position: fixed; inset: auto 0 0 0; bottom: 14px; z-index: 20;
+    pointer-events: none; height: 92px;
+  }
+  .key-cluster { position: absolute; bottom: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  #kc-left { left: 20px; }
+  #kc-right { right: 20px; }
+  #kc-mid { left: 50%; transform: translateX(-50%); }
+  #kc-left { flex-direction: row; align-items: flex-end; gap: 10px; }
+  .key-cluster .cap-tips {
+    display: flex; flex-direction: column; gap: 2px; align-items: center;
+    font-family: var(--pixel); font-size: 8px; letter-spacing: 1px; color: #6f6f76;
+  }
+  #kc-left .cap-tips { align-items: flex-start; }
+  /* keycap — style des touches importées (cap noir, jupe extrudée, glyphe blanc) */
+  .cap {
+    pointer-events: auto; cursor: pointer; position: relative;
+    min-width: 54px; height: 54px; padding: 0 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--pixel); font-size: 15px; color: #fafafa;
+    background: linear-gradient(#161618, #050506);
+    border: none; border-radius: 16px;
+    box-shadow: 0 7px 0 #000, 0 10px 12px rgba(0,0,0,.6),
+                inset 0 2px 0 rgba(255,255,255,.12), inset 0 -7px 12px rgba(0,0,0,.65);
+    transition: transform .05s ease, box-shadow .05s ease, background .08s, color .08s;
+    user-select: none;
+  }
+  .cap .cap-face { transform: translateY(-1px); }
+  .cap .cap-arrow { width: 24px; height: 24px; fill: #fafafa; display: block; }
+  .cap .cap-letter { display: none; }
+  .cap.cap-space { min-width: 300px; height: 56px; letter-spacing: 5px; font-size: 14px; }
+  .cap.cap-dir { min-width: 54px; height: 54px; padding: 0; }
+  .cap:hover { background: linear-gradient(#1d1d20, #08080a); }
+  .cap.down {
+    transform: translateY(7px);
+    background: linear-gradient(#2a2a30, #101013);
+    color: #7fd2ff;
+    box-shadow: 0 0 0 #000, 0 2px 4px rgba(0,0,0,.5),
+                inset 0 2px 0 rgba(255,255,255,.10), 0 0 16px rgba(120,214,255,.5);
+  }
+  .cap.down .cap-arrow { fill: #7fd2ff; }
+  /* arrow rotation per direction (un seul dessin tourné) */
+  .cap-dir[data-cap="up"]    .cap-arrow { transform: rotate(0deg); }
+  .cap-dir[data-cap="right"] .cap-arrow { transform: rotate(90deg); }
+  .cap-dir[data-cap="down"]  .cap-arrow { transform: rotate(180deg); }
+  .cap-dir[data-cap="left"]  .cap-arrow { transform: rotate(270deg); }
+  /* mode lettres (ZQSD) : on cache la flèche, on montre la lettre */
+  #controls.letters .cap-dir .cap-arrow { display: none; }
+  #controls.letters .cap-dir .cap-letter { display: inline; }
+  /* dpad : croix */
+  .dpad { display: grid; grid-template-columns: repeat(3, 54px); grid-template-rows: repeat(2, 54px); gap: 7px; }
+  .dpad .cap-dir[data-cap="up"]    { grid-area: 1 / 2 / 2 / 3; }
+  .dpad .cap-dir[data-cap="left"]  { grid-area: 2 / 1 / 3 / 2; }
+  .dpad .cap-dir[data-cap="down"]  { grid-area: 2 / 2 / 3 / 3; }
+  .dpad .cap-dir[data-cap="right"] { grid-area: 2 / 3 / 3 / 4; }
+  .dlg-open #controls { opacity: 0; pointer-events: none; }
+
+  /* ---------------- MESSAGE COMPAGNON (dialogue RPG en bas, non bloquant) ---------------- */
+  #toast {
+    position: fixed; bottom: 120px; left: 50%; transform: translate(-50%, 16px);
+    z-index: 30; width: min(760px, 92vw);
+    display: flex; align-items: center; gap: 14px;
+    font-size: 23px; line-height: 1.2; color: #f4f4f4;
+    background: #0a0a0a; border: 3px solid #fff;
+    box-shadow: 0 0 0 3px #000, 0 0 0 5px #2a2a2a, 0 16px 40px rgba(0,0,0,.7);
+    padding: 12px 18px; opacity: 0; pointer-events: none;
+    transition: opacity .2s, transform .2s;
+  }
+  #toast canvas { flex: 0 0 auto; width: 56px; height: 56px; background: #050505; border: 2px solid rgba(255,255,255,0.3); }
+  #toast .toast-body { display: flex; flex-direction: column; gap: 3px; text-align: left; }
+  #toast .toast-who {
+    font-family: 'Press Start 2P', monospace; font-size: 11px; letter-spacing: 1px;
+    color: #f4cf6a; text-transform: uppercase;
+  }
+  #toast .toast-msg { text-wrap: pretty; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #toast.gold { border-color: #f4cf6a; }
+  #toast.gold .toast-who { color: #f4cf6a; }
+  #toast.sys { border-color: #6b6b72; }
+  #toast.sys canvas { display: none; }
+  #toast.sys .toast-who { color: #9a9aa2; }
+  .dlg-open #toast { opacity: 0; }
+
+  /* ---------------- DIALOGUE BOX ---------------- */
+  #dialogue {
+    position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 24px);
+    width: min(900px, 92vw); z-index: 40; opacity: 0; pointer-events: none;
+    transition: opacity .2s, transform .2s;
+  }
+  #dialogue.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  .dlg-frame {
+    background: #0a0a0a; border: 3px solid #fff;
+    box-shadow: 0 0 0 3px #000, 0 0 0 5px #2a2a2a, 0 16px 40px rgba(0,0,0,.7);
+    padding: 16px; display: flex; gap: 16px; align-items: stretch;
+  }
+  #dlg-portrait {
+    width: 92px; height: 92px; flex: 0 0 92px;
+    background: #050505; border: 2px solid rgba(255,255,255,0.3);
+    image-rendering: pixelated;
+  }
+  .dlg-main { flex: 1; min-width: 0; position: relative; }
+  #dlg-name {
+    font-family: var(--pixel); font-size: 11px; color: #f4cf6a;
+    margin-bottom: 10px; letter-spacing: 1px;
+  }
+  #dlg-text {
+    font-size: 27px; line-height: 1.25; color: #f4f4f4; min-height: 64px;
+    text-wrap: pretty;
+  }
+  #dlg-text.crypt { font-size: 34px; letter-spacing: 4px; color: #9fe6ff; }
+  #dlg-arrow {
+    position: absolute; right: 4px; bottom: -2px; color: #fff; font-size: 20px;
+    animation: bob 0.7s infinite; opacity: 0;
+  }
+  @keyframes bob { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(4px);} }
+
+  #dlg-choices { display: none; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  #dlg-choices.show { display: grid; }
+  .choice {
+    font-size: 22px; color: #ddd; cursor: pointer;
+    border: 2px solid rgba(255,255,255,0.25); padding: 8px 12px;
+    transition: background .12s, border-color .12s, color .12s;
+  }
+  .choice b { font-family: var(--pixel); font-size: 12px; color: #f4cf6a; margin-right: 8px; }
+  .choice:hover { background: #fff; color: #000; border-color: #fff; }
+  .choice:hover b { color: #000; }
+
+  /* ---------------- INTRO ---------------- */
+  #intro {
+    position: fixed; inset: 0; z-index: 60; background: #0a0a0a;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; gap: 26px; overflow: hidden;
+    transition: opacity .7s ease;
+  }
+  #intro.hide { opacity: 0; }
+  #intro .stars { position: absolute; inset: 0; opacity: .5; pointer-events: none; }
+  /* base = visible (robuste). Animation d'entrée seulement si dispo. */
+  #intro .kicker {
+    font-family: var(--pixel); font-size: 11px; letter-spacing: 4px; color: #f4cf6a;
+  }
+  #intro h1 {
+    font-family: var(--pixel); font-size: clamp(20px, 5vw, 46px); line-height: 1.4;
+    color: #fff; letter-spacing: 2px; text-shadow: 0 0 0 #000, 4px 4px 0 #1f1f1f;
+  }
+  #intro .sub { font-size: 26px; color: #bdbdbd; max-width: 600px; line-height: 1.3; }
+  #intro .age {
+    font-family: var(--pixel); font-size: 14px; color: #9fe6ff; letter-spacing: 2px;
+  }
+  #startBtn {
+    position: relative; z-index: 3;
+    font-family: var(--pixel); font-size: 14px; letter-spacing: 2px; cursor: pointer;
+    color: #0a0a0a; background: #fff; border: none; padding: 18px 30px;
+    box-shadow: 0 0 0 3px #000, 0 0 0 6px #fff; margin-top: 6px;
+    transition: transform .1s, box-shadow .15s;
+  }
+  #startBtn:hover { transform: translateY(-2px); box-shadow: 0 0 0 3px #000, 0 0 0 6px #f4cf6a; }
+  #startBtn:active { transform: translateY(1px); }
+  #resetBtn {
+    position: relative; z-index: 3; font-family: var(--pixel); font-size: 9px; letter-spacing: 1px;
+    cursor: pointer; color: #888; background: transparent; border: 1px solid rgba(255,255,255,0.18);
+    padding: 8px 14px; margin-top: -8px; transition: color .15s, border-color .15s;
+  }
+  #resetBtn:hover { color: #f4cf6a; border-color: rgba(244,207,106,0.5); }
+  #intro .hint { font-size: 18px; color: #555; }
+  /* entrée douce, pilotée par JS via .ready, basée transition (fiable) */
+  @media (prefers-reduced-motion: no-preference) {
+    #intro.anim .kicker, #intro.anim h1, #intro.anim .sub,
+    #intro.anim .age, #intro.anim #startBtn, #intro.anim .hint {
+      opacity: 0; transform: translateY(16px);
+      transition: opacity .7s ease, transform .7s ease;
+    }
+    #intro.anim.ready .kicker { opacity: 1; transform: none; transition-delay: .15s; }
+    #intro.anim.ready h1     { opacity: 1; transform: none; transition-delay: .35s; }
+    #intro.anim.ready .sub   { opacity: 1; transform: none; transition-delay: .6s; }
+    #intro.anim.ready .age   { opacity: 1; transform: none; transition-delay: .8s; }
+    #intro.anim.ready #startBtn { opacity: 1; transform: none; transition-delay: .45s; }
+    #intro.anim.ready .hint  { opacity: 1; transform: none; transition-delay: .6s; }
+  }
+
+  /* ---------------- INVENTORY ---------------- */
+  #inventory {
+    position: fixed; inset: 0; z-index: 50; background: rgba(5,5,5,0.94);
+    display: none; flex-direction: column; align-items: center; justify-content: flex-start; gap: 18px;
+    padding: 34px 16px 26px; overflow-y: auto;
+  }
+  #inventory.show { display: flex; }
+  #inventory h2 { font-family: var(--pixel); font-size: 16px; color: #f4cf6a; letter-spacing: 2px; }
+  #inv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .inv-cell {
+    width: 150px; background: #0e0e0e; border: 2px solid rgba(255,255,255,0.25);
+    padding: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .inv-cell.locked { opacity: .5; border-style: dashed; }
+  .inv-label { font-size: 20px; color: #ddd; text-align: center; }
+  .inv-close {
+    font-family: var(--pixel); font-size: 11px; cursor: pointer; color: #0a0a0a;
+    background: #fff; border: none; padding: 12px 22px;
+  }
+  /* téléporteur d'étage dans l'inventaire */
+  #inv-floortele { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 8px; padding-top: 16px; width: min(700px, 92vw); border-top: 2px solid rgba(255,255,255,0.12); }
+  #inv-floortele:empty { display: none; border: none; padding: 0; margin: 0; }
+  .inv-ft-title { font-family: var(--pixel); font-size: 12px; color: #5fd0ff; letter-spacing: 2px; }
+  .inv-ft-sub { font-size: 17px; color: #9a9aa2; text-align: center; }
+  .inv-ft-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 640px; margin-top: 4px; }
+  .inv-ft-btn {
+    font-family: var(--pixel); font-size: 11px; cursor: pointer; color: #0a0a0a;
+    background: #5fd0ff; border: none; padding: 11px 13px; transition: transform .1s, background .12s;
+  }
+  .inv-ft-btn:hover:not(:disabled) { transform: translateY(-1px); background: #9fe8ff; }
+  .inv-ft-btn.locked { background: #161616; color: #4a4a4a; cursor: not-allowed; border: 2px solid rgba(255,255,255,0.08); }
+  .inv-ft-btn.here { background: #fff; color: #0a0a0a; cursor: default; outline: 2px solid #5fd0ff; outline-offset: 1px; }
+
+  /* ---------------- GALLERY NAV ---------------- */
+  #gallery-nav {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    z-index: 45; display: none; align-items: center; gap: 12px;
+    background: rgba(8,8,8,0.92); border: 2px solid #5fd0ff;
+    box-shadow: 0 0 0 2px #000, 0 10px 30px rgba(0,0,0,.6); padding: 10px 12px;
+  }
+  #gallery-nav.show { display: flex; }
+  #gallery-nav #gal-label {
+    font-family: var(--body); font-size: 20px; color: #eee; min-width: 220px;
+    text-align: center; padding: 0 6px;
+  }
+  #gallery-nav button {
+    font-family: var(--pixel); font-size: 10px; letter-spacing: 1px; cursor: pointer;
+    color: #0a0a0a; background: #fff; border: none; padding: 11px 14px;
+    transition: transform .1s, background .12s;
+  }
+  #gallery-nav button:hover { transform: translateY(-1px); }
+  #gallery-nav #gal-exit { background: #1a1a1a; color: #fff; border: 2px solid #fff; }
+
+  #gallery-nav { z-index: 58; }
+  /* ---------------- PHOTO VIEW ---------------- */
+  #photoview {
+    position: fixed; inset: 0; z-index: 55; background: rgba(4,4,4,0.94);
+    display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  }
+  #photoview.show { display: flex; }
+  #photo-year { font-family: var(--pixel); font-size: 11px; color: #f4cf6a; letter-spacing: 2px; text-align: center; }
+  #photo-frame {
+    width: min(62vw, 560px); height: min(62vh, 420px);
+    background: linear-gradient(135deg, #1a1a1f, #070708);
+    border: 10px solid #ededed; box-shadow: 0 0 0 3px #000, 0 20px 60px rgba(0,0,0,.7);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--pixel); font-size: 14px; color: #6a6a6a; letter-spacing: 2px;
+  }
+  #photo-frame.locked { color: #555; font-size: 60px; }
+  #photo-cap { font-size: 26px; color: #e8e8e8; max-width: 620px; text-align: center; line-height: 1.3; text-wrap: pretty; }
+  #photo-hint { font-family: var(--pixel); font-size: 9px; color: #777; letter-spacing: 1px; }
+
+  /* ---------------- END CARD ---------------- */
+  #endcard {
+    position: fixed; inset: 0; z-index: 70; background: rgba(6,6,6,0.96);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; gap: 18px; padding: 24px;
+  }
+  #endcard.show { display: flex; animation: fadeIn 1s ease; }
+  @keyframes fadeIn { from { opacity: 0;} to { opacity: 1;} }
+  #endcard .end-top { display: flex; flex-direction: column; align-items: center; gap: 10px; flex: 0 0 auto; }
+  #endcard .big {
+    font-family: var(--pixel); font-size: clamp(18px, 4vw, 36px); color: #fff;
+    letter-spacing: 2px; line-height: 1.5; text-shadow: 4px 4px 0 #1f1f1f; text-align: center;
+  }
+  #endcard .gold { color: #f4cf6a; }
+  #end-complete { font-family: var(--pixel); font-size: 12px; color: #888; letter-spacing: 1px; }
+  /* fenêtre des crédits qui défilent */
+  .credits-window {
+    flex: 1 1 auto; width: min(760px, 92vw); overflow: hidden; position: relative; margin: 6px 0;
+    -webkit-mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
+            mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
+  }
+  .credits-roll {
+    position: absolute; left: 0; right: 0; top: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center;
+    animation: creditScroll 34s linear infinite;
+  }
+  #endcard.show .credits-roll { animation: creditScroll 34s linear infinite; }
+  @keyframes creditScroll {
+    0%   { transform: translateY(82%); }
+    100% { transform: translateY(-100%); }
+  }
+  .cr-lore { font-size: 24px; color: #d8d8d8; line-height: 1.4; max-width: 660px; text-wrap: pretty; }
+  .cr-fin { font-family: var(--pixel); font-size: 14px; color: #f4cf6a; letter-spacing: 3px; margin: 8px 0 60px; }
+  .cr-head {
+    font-family: var(--pixel); font-size: 12px; letter-spacing: 3px; color: #5fd0ff;
+    margin-top: 18px; padding-bottom: 4px; border-bottom: 2px solid rgba(95,208,255,0.35);
+  }
+  .cr-row { display: flex; flex-direction: column; gap: 2px; }
+  .cr-role { font-family: var(--pixel); font-size: 9px; letter-spacing: 1px; color: #8a8a90; text-transform: uppercase; }
+  .cr-name { font-size: 24px; color: #fff; }
+  .cr-name em { color: #f4cf6a; font-style: normal; font-size: 19px; }
+  .cr-rank { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+  .cr-rk { display: flex; flex-direction: column; gap: 3px; align-items: center;
+    border: 2px solid rgba(255,255,255,0.14); padding: 10px 16px; max-width: 560px; }
+  .cr-pos { font-family: var(--pixel); font-size: 16px; color: #f4cf6a; }
+  .cr-who { font-size: 26px; color: #fff; }
+  .cr-sc { font-size: 18px; color: #b8b8be; text-wrap: pretty; }
+  .cr-sc b { color: #f4cf6a; } .cr-sc em { color: #9a9aa2; font-style: italic; }
+  #endcard .btns { display: flex; gap: 14px; flex: 0 0 auto; }
+  #endcard button {
+    font-family: var(--pixel); font-size: 12px; cursor: pointer; padding: 14px 22px; border: none;
+  }
+  #endClose { background: #fff; color: #0a0a0a; }
+  #endReplay { background: #1a1a1a; color: #fff; border: 2px solid #fff !important; }
+
+  /* ---------------- FX ---------------- */
+  #iris { position: fixed; inset: 0; z-index: 80; display: none; pointer-events: none; }
+  #fade {
+    position: fixed; inset: 0; z-index: 75; background: #000; opacity: 0;
+    pointer-events: none; transition: opacity .25s;
+  }
+</style>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Titre centré -->
+  <div id="title"><span id="title-text">Le Vide</span></div>
+
+  <!-- HUD (haut-droite) : étage + infos + minimap -->
+  <div id="hud">
+    <div id="mm-floor">—</div>
+    <div class="hud-stats">
+      <span class="stat"><span class="gicon gicon-glasses"><svg viewBox="0 0 28 12" fill="none" stroke="#f4cf6a" stroke-width="2" stroke-linejoin="round"><rect x="1.5" y="2" width="9" height="8" rx="2"></rect><rect x="17.5" y="2" width="9" height="8" rx="2"></rect><path d="M10.5 5.5 H17.5"></path></svg></span><span class="v" id="hud-glasses">0/8</span></span>
+      <span class="stat"><span class="v" id="hud-coins">0</span><span class="gicon gicon-euro">€</span></span>
+    </div>
+    <canvas id="minimap" width="188" height="132"></canvas>
+  </div>
+
+  <div id="controls">
+    <div class="key-cluster" id="kc-left">
+      <div class="cap" data-cap="E"><span class="cap-face">E</span></div>
+      <div class="cap" data-cap="I"><span class="cap-face">I</span></div>
+      <div class="cap-tips"><span>E · parler</span><span>I · lunettes</span></div>
+    </div>
+    <div class="key-cluster" id="kc-mid">
+      <div class="cap cap-space" data-cap="space"><span class="cap-face">ESPACE</span></div>
+      <div class="cap-tips"><span>avancer · maintenir = saut</span></div>
+    </div>
+    <div class="key-cluster" id="kc-right">
+      <div class="dpad">
+        <div class="cap cap-dir" data-cap="up"><svg class="cap-arrow" viewBox="0 0 24 24"><path d="M12 3.5L21 12.5H16.2V20.5H7.8V12.5H3L12 3.5Z"></path></svg><span class="cap-letter">Z</span></div>
+        <div class="cap cap-dir" data-cap="left"><svg class="cap-arrow" viewBox="0 0 24 24"><path d="M12 3.5L21 12.5H16.2V20.5H7.8V12.5H3L12 3.5Z"></path></svg><span class="cap-letter">Q</span></div>
+        <div class="cap cap-dir" data-cap="down"><svg class="cap-arrow" viewBox="0 0 24 24"><path d="M12 3.5L21 12.5H16.2V20.5H7.8V12.5H3L12 3.5Z"></path></svg><span class="cap-letter">S</span></div>
+        <div class="cap cap-dir" data-cap="right"><svg class="cap-arrow" viewBox="0 0 24 24"><path d="M12 3.5L21 12.5H16.2V20.5H7.8V12.5H3L12 3.5Z"></path></svg><span class="cap-letter">D</span></div>
+      </div>
+      <div class="cap-tips"><span>se tourner / viser</span></div>
+    </div>
+  </div>
+
+  <!-- Toast (Rémy) -->
+  <div id="toast"><canvas id="toast-face" width="46" height="46"></canvas><div class="toast-body"><span id="toast-who" class="toast-who"></span><span id="toast-msg" class="toast-msg"></span></div></div>
+
+  <!-- Dialogue -->
+  <div id="dialogue">
+    <div class="dlg-frame">
+      <canvas id="dlg-portrait" width="92" height="92"></canvas>
+      <div class="dlg-main">
+        <div id="dlg-name">Rémy</div>
+        <div id="dlg-text"></div>
+        <div id="dlg-choices"></div>
+        <div id="dlg-arrow">▼</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Galerie : barre de navigation -->
+  <div id="gallery-nav">
+    <button id="gal-prev">◀ PRÉCÉDENT</button>
+    <div id="gal-label">Galerie des souvenirs</div>
+    <button id="gal-next">SUIVANT ▶</button>
+    <button id="gal-exit">QUITTER</button>
+  </div>
+
+  <!-- Photo view -->
+  <div id="photoview">
+    <div id="photo-year"></div>
+    <div id="photo-frame">PHOTO</div>
+    <div id="photo-cap"></div>
+    <div id="photo-hint">E / ENTRÉE / ÉCHAP — FERMER</div>
+  </div>
+
+  <!-- Inventory -->
+  <div id="inventory">
+    <h2>COLLECTION DE LUNETTES</h2>
+    <div id="inv-grid"></div>
+    <button class="inv-close">FERMER</button>
+  </div>
+
+  <!-- Intro -->
+  <div id="intro">
+    <canvas class="stars" id="stars"></canvas>
+    <div class="kicker">JOYEUX ANNIVERSAIRE</div>
+    <h1>LE MUSÉE<br />DU GOAT</h1>
+    <div class="sub">Un petit voyage dans nos souvenirs. Entre dossiers, sarcasme et quelques photos qu'on aurait dû supprimer.</div>
+    <div class="age">★ 24 ANS · 8 ANS D'AMITIÉ ★</div>
+    <button id="startBtn">COMMENCER</button>
+    <button id="resetBtn" style="display:none">EFFACER LA SAUVEGARDE</button>
+    <div class="hint">Certaines choses auraient dû rester cachées.</div>
+  </div>
+
+  <!-- End card -->
+  <div id="endcard">
+    <div class="end-top">
+      <div class="big">JOYEUX <span class="gold">ANNIVERSAIRE</span> FRÉROT</div>
+      <div id="end-complete"></div>
+    </div>
+    <div class="credits-window">
+      <div id="credits-roll" class="credits-roll">
+        <p class="cr-lore">Quelque part entre deux sauts ratés et un quiz foiré,<br/>on a bâti 8 ans d'amitié.</p>
+        <p class="cr-lore">Ce musée n'en est qu'un échantillon. La vraie collection,<br/>elle, rentre pas dans une salle. Bon anniv, mon reuf.</p>
+
+        <div class="cr-head">CONÇU POUR TES 24 ANS</div>
+
+        <div class="cr-row"><span class="cr-role">Conception &amp; développement</span><span class="cr-name">Rémy PENICHON <em>aka Garok</em></span></div>
+        <div class="cr-row"><span class="cr-role">Direction artistique</span><span class="cr-name">Rémy PENICHON <em>aka Shintokeuuu</em></span></div>
+        <div class="cr-row"><span class="cr-role">Scénario &amp; vannes</span><span class="cr-name">Rémy PENICHON <em>aka 0x52-EMI</em></span></div>
+        <div class="cr-row"><span class="cr-role">Level design abyssal</span><span class="cr-name">Rémy PENICHON <em>aka le Guez</em></span></div>
+        <div class="cr-row"><span class="cr-role">Acteur principal</span><span class="cr-name">Antoine PECHARD <em>dans son propre rôle</em></span></div>
+
+        <div class="cr-head">CLASSEMENT MONDIAL</div>
+
+        <div class="cr-rank">
+          <div class="cr-rk"><span class="cr-pos">#1</span><span class="cr-who">Antoine PECHARD</span><span class="cr-sc">Score ∞ · Pièces ∞ · Speedrun 00:00:01 · 0 chute — <b>LÉGENDE</b></span></div>
+          <div class="cr-rk"><span class="cr-pos">#2</span><span class="cr-who">Rémy PENICHON</span><span class="cr-sc">Score −42 <em>(= son QI, paraît-il)</em></span></div>
+        </div>
+
+        <p class="cr-lore">Merci d'exister, frérot.</p>
+        <p class="cr-fin">— FIN ? —</p>
+      </div>
+    </div>
+    <div class="btns">
+      <button id="endClose">REVOIR LES SOUVENeIRS</button>
+      <button id="endReplay">REJOUER</button>
+    </div>
+  </div>
+
+  <!-- FX -->
+  <div id="fade"></div>
+  <div id="iris"></div>
+
+  <script>
+    // étoiles discrètes sur l'intro
+    (function () {
+      const c = document.getElementById('stars');
+      function r() { c.width = innerWidth; c.height = innerHeight; const x = c.getContext('2d');
+        x.clearRect(0,0,c.width,c.height);
+        for (let i=0;i<90;i++){ x.globalAlpha = Math.random()*0.5+0.1; x.fillStyle='#fff';
+          x.fillRect(Math.random()*c.width, Math.random()*c.height, Math.random()<0.2?2:1, 1); } }
+      r(); addEventListener('resize', r);
+    })();
+    // entrée douce de l'intro (transition pilotée JS, fiable)
+    (function () {
+      const intro = document.getElementById('intro');
+      intro.classList.add('anim');
+      requestAnimationFrame(() => requestAnimationFrame(() => intro.classList.add('ready')));
+      setTimeout(() => intro.classList.add('ready'), 200);   // filet de sécurité
+    })();
+    // classe pour masquer les contrôles quand un dialogue est ouvert
+    const _obs = new MutationObserver(() => {
+      document.body.classList.toggle('dlg-open', document.getElementById('dialogue').classList.contains('show'));
+    });
+    _obs.observe(document.getElementById('dialogue'), { attributes: true, attributeFilter: ['class'] });
+  </script>
+  <script src="data.js"></script>
+  <script src="render.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
