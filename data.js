@@ -899,13 +899,12 @@ window.GAME_DATA = (function () {
       }
     });
 
-    // contenu : carte, puis photos + lunettes entrelacées
+    // contenu : carte, puis photos uniquement
     const items = [{ kind: "map" }];
-    let pi = 0, gi = 0;
-    while (pi < uniqueGalleryPhotos.length || gi < glasses.length) {
-      if (pi < uniqueGalleryPhotos.length) items.push({ kind: "photo", photo: uniqueGalleryPhotos[pi][0], caption: uniqueGalleryPhotos[pi][1] }), pi++;
-      if (pi < uniqueGalleryPhotos.length) items.push({ kind: "photo", photo: uniqueGalleryPhotos[pi][0], caption: uniqueGalleryPhotos[pi][1] }), pi++;
-      if (gi < glasses.length) items.push({ kind: "glass", glasses: glasses[gi] }), gi++;
+    let pi = 0;
+    while (pi < uniqueGalleryPhotos.length) {
+      items.push({ kind: "photo", photo: uniqueGalleryPhotos[pi][0], caption: uniqueGalleryPhotos[pi][1] });
+      pi++;
     }
     const startX = 2, step = 2, len = startX + items.length * step + 3;
     for (let x = 0; x < len; x++) for (let y = 0; y < 3; y++) put(x, y, { depth: 4, bright: true });

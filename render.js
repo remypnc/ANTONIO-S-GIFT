@@ -654,6 +654,28 @@
       ctx.fillStyle = shade("#0c0c0c", L); ctx.fillRect(ix, iy, iw, ih);
       ctx.fillStyle = shade("#666", Math.max(0.5, L)); ctx.font = "22px 'Press Start 2P'"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText("?", cx, iy + ih / 2); ctx.textBaseline = "alphabetic";
+    } else if (opts.photo === "map") {
+      const gg = ctx.createLinearGradient(ix, iy, ix + iw, iy + ih);
+      gg.addColorStop(0, shade("#091629", L)); gg.addColorStop(1, shade("#03070f", L));
+      ctx.fillStyle = gg; ctx.fillRect(ix, iy, iw, ih);
+      
+      // Draw a mini schematic map (dots and paths)
+      ctx.strokeStyle = shade("#5fd0ff", L * 0.75); ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(ix + 12, iy + 84);
+      ctx.lineTo(ix + 28, iy + 62);
+      ctx.lineTo(ix + 42, iy + 72);
+      ctx.lineTo(ix + 58, iy + 38);
+      ctx.stroke();
+      
+      ctx.fillStyle = shade("#f4cf6a", L);
+      ctx.beginPath(); ctx.arc(ix + 12, iy + 84, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ix + 28, iy + 62, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ix + 42, iy + 72, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ix + 58, iy + 38, 2.5, 0, Math.PI * 2); ctx.fill();
+      
+      ctx.fillStyle = shade("#5fd0ff", Math.max(0.45, L)); ctx.font = "5px 'Press Start 2P'"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("CARTE", cx, iy + ih / 2 - 12); ctx.textBaseline = "alphabetic";
     } else if (opts.img && opts.img.complete && opts.img.naturalWidth) {
       ctx.save(); ctx.beginPath(); ctx.rect(ix, iy, iw, ih); ctx.clip();
       const ir = opts.img.naturalWidth / opts.img.naturalHeight, fr = iw / ih;

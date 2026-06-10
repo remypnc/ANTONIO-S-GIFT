@@ -402,6 +402,28 @@
   function warpToFloor(rid) { if (rid === roomId) return; goRoom(rid, null, null); }
 
   /* ----------------------------- PHOTO ------------------------------- */
+  const mapNodes = [
+    { id: "hub", label: "HUB", x: 70, y: 340, desc: "Départ" },
+    { id: "2019", label: "2019", x: 130, y: 260, desc: "Rencontres" },
+    { id: "2020", label: "2020", x: 190, y: 320, desc: "Entraide" },
+    { id: "2021", label: "2021", x: 270, y: 280, desc: "Délires" },
+    { id: "2022", label: "2022", x: 330, y: 200, desc: "Partage" },
+    { id: "2023", label: "2023", x: 380, y: 270, desc: "Fac & Rires" },
+    { id: "2024", label: "2024", x: 440, y: 190, desc: "Style & Drip" },
+    { id: "2025", label: "2025", x: 490, y: 110, desc: "Complicité" },
+    { id: "final", label: "FINAL", x: 390, y: 70, desc: "Fête" },
+    { id: "gallery", label: "GALERIE", x: 230, y: 110, desc: "Musée" }
+  ];
+  
+  const isVisited = (nodeId) => {
+    if (nodeId === "hub") return true;
+    if (nodeId === "gallery") return !!finished || roomId === "gallery";
+    const idx = D.ORDER.indexOf(nodeId);
+    if (idx >= 0) return idx <= maxFloorReached;
+    return false;
+  };
+
+  /* ----------------------------- PHOTO ------------------------------- */
   function openPhoto(tile) {
     overlay = "photo";
     const cap = $("photo-cap"), yr = $("photo-year");
@@ -421,6 +443,71 @@
       frame.appendChild(canvasEl);
       activeMapCanvas = canvasEl;
       drawMapOnCanvas(canvasEl);
+      
+      // Interactive node click logic
+      canvasEl.addEventListener("click", (e) => {
+        const rect = canvasEl.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (canvasEl.width / rect.width);
+        const my = (e.clientY - rect.top) * (canvasEl.height / rect.height);
+        
+        let clickedNode = null;
+        for (const node of mapNodes) {
+          const dist = Math.hypot(mx - node.x, my - node.y);
+          if (dist < 25) {
+            clickedNode = node;
+            break;
+          }
+        }
+        
+        if (clickedNode) {
+          if (!isVisited(clickedNode.id)) {
+            toast("Zone non encore foulée. Continue ton exploration !");
+            return;
+          }
+          
+          let photos = [];
+          if (clickedNode.id === "hub") {
+            photos = D.GALLERY_PHOTOS.filter(gp => gp[0].startsWith("enfance_"));
+          } else if (clickedNode.id === "final") {
+            photos = D.GALLERY_PHOTOS.filter(gp => gp[0].startsWith("photo_2026_") || gp[0] === "toi_moi" || gp[0] === "24ans");
+          } else if (clickedNode.id === "gallery") {
+            const seen = new Set();
+            D.GALLERY_PHOTOS.forEach(gp => {
+              const path = D.PHOTO_PATHS[gp[0]];
+              if (path && !seen.has(path.toLowerCase())) {
+                seen.add(path.toLowerCase());
+                photos.push(gp);
+              }
+            });
+          } else {
+            photos = D.GALLERY_PHOTOS.filter(gp => gp[0].startsWith("photo_" + clickedNode.id + "_"));
+          }
+          
+          if (photos.length === 0) {
+            toast("Aucune photo pour cette zone.");
+            return;
+          }
+          
+          closePhoto();
+          
+          const opts = photos.map(gp => gp[1]);
+          opts.push("Retour à la carte");
+          
+          askChoice("remy", "Souvenirs de " + clickedNode.label + " :", opts, (i) => {
+            if (i === photos.length) {
+              openPhoto({ photo: "map", caption: "La carte du musée — tout ce que t'as foulé." });
+            } else {
+              const selectedPhoto = photos[i];
+              openPhoto({
+                caption: selectedPhoto[1],
+                locked: false,
+                _img: IMAGES[selectedPhoto[0]],
+                photo: selectedPhoto[0]
+              });
+            }
+          });
+        }
+      });
     } else if (tile._img) {
       const imgEl = document.createElement("img");
       imgEl.src = tile._img.src;
@@ -460,20 +547,6 @@
     }
     ctx.globalAlpha = 1.0;
     
-    // Nodes for each room
-    const mapNodes = [
-      { id: "hub", label: "HUB", x: 70, y: 340, desc: "Départ" },
-      { id: "2019", label: "2019", x: 130, y: 260, desc: "Saut" },
-      { id: "2020", label: "2020", x: 190, y: 320, desc: "Énigme" },
-      { id: "2021", label: "2021", x: 270, y: 280, desc: "Bug" },
-      { id: "2022", label: "2022", x: 330, y: 200, desc: "Maxime" },
-      { id: "2023", label: "2023", x: 380, y: 270, desc: "Fac" },
-      { id: "2024", label: "2024", x: 440, y: 190, desc: "Pic style" },
-      { id: "2025", label: "2025", x: 490, y: 110, desc: "Theniou" },
-      { id: "final", label: "FINAL", x: 390, y: 70, desc: "Anniv" },
-      { id: "gallery", label: "GALERIE", x: 230, y: 110, desc: "Souvenirs" }
-    ];
-    
     const connections = [
       ["hub", "2019"],
       ["2019", "2020"],
@@ -483,18 +556,8 @@
       ["2023", "2024"],
       ["2024", "2025"],
       ["2025", "final"],
-      ["final", "gallery"],
-      ["gallery", "hub"]
+      ["final", "gallery"]
     ];
-    
-    // Check if node is visited
-    const isVisited = (nodeId) => {
-      if (nodeId === "hub") return true;
-      if (nodeId === "gallery") return !!finished || roomId === "gallery";
-      const idx = D.ORDER.indexOf(nodeId);
-      if (idx >= 0) return idx <= maxFloorReached;
-      return false;
-    };
     
     // Draw connections
     connections.forEach(([n1, n2]) => {
@@ -1104,7 +1167,7 @@
       if (tile.dropHole) R.drawDropPit(ctx, info, t, light);
       if (tile.arrow && (showArrows() || roomId === "hub" || (room && room.gallery))) R.drawFloorArrow(ctx, info, tile.arrow, clamp(light * 1.2, 0.45, 0.95));
       if (tile.type === "glasses" && tile.glasses && !collected.has(tile.glasses)) { const g = D.GLASSES[tile.glasses]; R.drawShadow(ctx, info.cx, info.cy + 4, 24, 0.4 * light); R.drawGlassesItem(ctx, info.cx, info.cy, 46, g.shape, t, g.rare); }
-      if (tile.type === "photo") R.drawPhoto(ctx, info, tile.caption, light, tile.locked, { hang: tile.hang, img: tile._img });
+      if (tile.type === "photo") R.drawPhoto(ctx, info, tile.caption, light, tile.locked, { hang: tile.hang, img: tile._img, photo: tile.photo });
       if (tile.type === "glassdisp") drawGlassDisp(tile, info, t, light);
       if (tile.type === "panel") R.drawSign(ctx, info, light, D.PANELS[tile.panel] && D.PANELS[tile.panel].glyph);
       if (tile.coin && !coinsGot.has(tile.x + "," + tile.y)) { const pulse = 0.6 + 0.4 * Math.sin(t * 3 + tile.x * 1.3); R.floorGlow(ctx, info.cx, info.cy + 2, 58, "rgb(244,207,106)", 0.22 * pulse); }
