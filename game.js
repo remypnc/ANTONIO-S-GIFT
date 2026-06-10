@@ -11,6 +11,7 @@
   const pctx = portrait.getContext("2d");
   const $ = (id) => document.getElementById(id);
   const IMAGES = {};
+  let activeMapCanvas = null;
   if (D.PHOTO_PATHS) {
     Object.entries(D.PHOTO_PATHS).forEach(([id, src]) => {
       const img = new Image();
@@ -312,7 +313,7 @@
     if (here && here.type === "teleport" && !(here.needFinished && !finished)) return { kind: "teleport", tile: here };
     if (here && here.type === "entry" && roomReturn[roomId] && !(room && room.voidtrap)) return { kind: "return", tile: here };
     for (const n of npcs) { if (Math.abs(n.x - player.x) + Math.abs(n.y - player.y) <= 1) return { kind: "npc", npc: n }; }
-    for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [0, -2], [0, -3]]) {
       const t = tileAt(player.x + dx, player.y + dy);
       if (t && t.type === "photo") return { kind: "photo", tile: t };
     }
@@ -411,6 +412,15 @@
     frame.innerHTML = "";
     if (tile.locked) {
       frame.textContent = "?";
+    } else if (tile.photo === "map") {
+      const canvasEl = document.createElement("canvas");
+      canvasEl.width = 560;
+      canvasEl.height = 420;
+      canvasEl.style.width = "100%";
+      canvasEl.style.height = "100%";
+      frame.appendChild(canvasEl);
+      activeMapCanvas = canvasEl;
+      drawMapOnCanvas(canvasEl);
     } else if (tile._img) {
       const imgEl = document.createElement("img");
       imgEl.src = tile._img.src;
@@ -424,6 +434,209 @@
   function closePhoto() {
     $("photoview").classList.remove("show"); overlay = null;
     document.body.classList.remove("dlg-open");
+    activeMapCanvas = null;
+  }
+
+  function drawMapOnCanvas(canvasEl) {
+    const ctx = canvasEl.getContext("2d");
+    const W = canvasEl.width;
+    const H = canvasEl.height;
+    
+    // Background
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, "#08080c");
+    grad.addColorStop(1, "#12121c");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    
+    // Draw some stars
+    ctx.fillStyle = "#ffffff";
+    for (let i = 0; i < 40; i++) {
+      const sx = Math.sin(i * 9.9) * 0.5 + 0.5;
+      const x = (Math.cos(i * 12.7) * 0.5 + 0.5) * W;
+      const y = (Math.sin(i * 24.3) * 0.5 + 0.5) * H;
+      ctx.globalAlpha = 0.15 + 0.45 * sx;
+      ctx.fillRect(x, y, sx > 0.6 ? 2 : 1, sx > 0.6 ? 2 : 1);
+    }
+    ctx.globalAlpha = 1.0;
+    
+    // Nodes for each room
+    const mapNodes = [
+      { id: "hub", label: "HUB", x: 70, y: 340, desc: "Départ" },
+      { id: "2019", label: "2019", x: 130, y: 260, desc: "Saut" },
+      { id: "2020", label: "2020", x: 190, y: 320, desc: "Énigme" },
+      { id: "2021", label: "2021", x: 270, y: 280, desc: "Bug" },
+      { id: "2022", label: "2022", x: 330, y: 200, desc: "Maxime" },
+      { id: "2023", label: "2023", x: 380, y: 270, desc: "Fac" },
+      { id: "2024", label: "2024", x: 440, y: 190, desc: "Pic style" },
+      { id: "2025", label: "2025", x: 490, y: 110, desc: "Theniou" },
+      { id: "final", label: "FINAL", x: 390, y: 70, desc: "Anniv" },
+      { id: "gallery", label: "GALERIE", x: 230, y: 110, desc: "Souvenirs" }
+    ];
+    
+    const connections = [
+      ["hub", "2019"],
+      ["2019", "2020"],
+      ["2020", "2021"],
+      ["2021", "2022"],
+      ["2022", "2023"],
+      ["2023", "2024"],
+      ["2024", "2025"],
+      ["2025", "final"],
+      ["final", "gallery"],
+      ["gallery", "hub"]
+    ];
+    
+    // Check if node is visited
+    const isVisited = (nodeId) => {
+      if (nodeId === "hub") return true;
+      if (nodeId === "gallery") return !!finished || roomId === "gallery";
+      const idx = D.ORDER.indexOf(nodeId);
+      if (idx >= 0) return idx <= maxFloorReached;
+      return false;
+    };
+    
+    // Draw connections
+    connections.forEach(([n1, n2]) => {
+      const node1 = mapNodes.find(n => n.id === n1);
+      const node2 = mapNodes.find(n => n.id === n2);
+      if (!node1 || !node2) return;
+      
+      const v1 = isVisited(n1);
+      const v2 = isVisited(n2);
+      const active = v1 && v2;
+      
+      ctx.lineWidth = active ? 4 : 2;
+      ctx.strokeStyle = active ? "#5fd0ff" : "#2d2d3a";
+      
+      if (active) {
+        ctx.shadowColor = "#5fd0ff";
+        ctx.shadowBlur = 6;
+      } else {
+        ctx.shadowBlur = 0;
+      }
+      
+      ctx.beginPath();
+      ctx.moveTo(node1.x, node1.y);
+      ctx.lineTo(node2.x, node2.y);
+      ctx.stroke();
+      
+      // Draw small arrow along the connection
+      if (active) {
+        const mx = (node1.x + node2.x) / 2;
+        const my = (node1.y + node2.y) / 2;
+        const angle = Math.atan2(node2.y - node1.y, node2.x - node1.x);
+        ctx.save();
+        ctx.translate(mx, my);
+        ctx.rotate(angle);
+        ctx.fillStyle = "#5fd0ff";
+        ctx.beginPath();
+        ctx.moveTo(-5, -4);
+        ctx.lineTo(5, 0);
+        ctx.lineTo(-5, 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+    });
+    
+    ctx.shadowBlur = 0; // reset shadow
+    
+    // Draw nodes
+    mapNodes.forEach(node => {
+      const visited = isVisited(node.id);
+      const current = node.id === roomId;
+      
+      const cx = node.x;
+      const cy = node.y;
+      const hw = 22;
+      const hh = 11;
+      
+      // Left side face
+      ctx.fillStyle = visited ? (current ? "#1b4d66" : "#2b3b4f") : "#1b1b24";
+      ctx.beginPath();
+      ctx.moveTo(cx - hw, cy);
+      ctx.lineTo(cx, cy + hh);
+      ctx.lineTo(cx, cy + hh + 10);
+      ctx.lineTo(cx - hw, cy + 10);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Right side face
+      ctx.fillStyle = visited ? (current ? "#0f2f40" : "#1a2533") : "#0f0f15";
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + hh);
+      ctx.lineTo(cx + hw, cy);
+      ctx.lineTo(cx + hw, cy + 10);
+      ctx.lineTo(cx, cy + hh + 10);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Top face
+      if (current) {
+        ctx.fillStyle = "#ffffff";
+        ctx.shadowColor = "#5fd0ff";
+        ctx.shadowBlur = 12;
+      } else if (visited) {
+        ctx.fillStyle = "#5fd0ff";
+        ctx.shadowColor = "#5fd0ff";
+        ctx.shadowBlur = 4;
+      } else {
+        ctx.fillStyle = "#474757";
+        ctx.shadowBlur = 0;
+      }
+      
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - hh);
+      ctx.lineTo(cx + hw, cy);
+      ctx.lineTo(cx, cy + hh);
+      ctx.lineTo(cx - hw, cy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.shadowBlur = 0; // reset shadow
+      
+      // Node label
+      ctx.font = "8px 'Press Start 2P'";
+      ctx.textAlign = "center";
+      ctx.fillStyle = current ? "#ffffff" : (visited ? "#5fd0ff" : "#5a5a6a");
+      ctx.fillText(node.label, cx, cy - 18);
+      
+      // Under-label descriptor
+      ctx.font = "14px 'VT323'";
+      ctx.fillStyle = current ? "#f4cf6a" : (visited ? "#cfcfdf" : "#444454");
+      ctx.fillText(node.desc, cx, cy + 28);
+      
+      // If current room, draw a small bounce marker above the node
+      if (current) {
+        const bounce = Math.sin(performance.now() * 0.008) * 3 - 6;
+        ctx.fillStyle = "#f4cf6a";
+        ctx.beginPath();
+        ctx.moveTo(cx - 4, cy - 26 + bounce);
+        ctx.lineTo(cx + 4, cy - 26 + bounce);
+        ctx.lineTo(cx, cy - 20 + bounce);
+        ctx.closePath();
+        ctx.fill();
+      }
+      
+      // If visited but not current, draw a tiny checkmark or glow dot
+      if (visited && !current && node.id !== "hub" && node.id !== "gallery") {
+        ctx.fillStyle = "#f4cf6a";
+        ctx.beginPath();
+        ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
+    
+    // Title inside map
+    ctx.font = "12px 'Press Start 2P'";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#f4cf6a";
+    ctx.fillText("CARTE DU MUSEE", 30, 40);
+    
+    ctx.font = "16px 'VT323'";
+    ctx.fillStyle = "#8a8a9a";
+    const visitedCount = mapNodes.filter(n => isVisited(n.id)).length;
+    ctx.fillText("Progression : " + visitedCount + " / " + mapNodes.length + " zones foulées", 30, 60);
   }
 
   function useTeleport(t) {
@@ -598,7 +811,7 @@
     $("gal-label").textContent = ex.caption || room.title;
     if (ex.kind === "exit") { toast("Au bout du chemin : un téléporteur de retour vers la salle principale. Monte dessus + E."); }
     else if (ex.kind === "glass") { const gl = D.GLASSES[ex.glasses]; toast(collected.has(ex.glasses) ? (gl.name + " — débloquée.") : (gl.name + " — pas débloquée."), collected.has(ex.glasses) ? "gold" : "sys"); }
-    else openPhoto({ caption: ex.caption, locked: false, _img: IMAGES[ex.photo] });
+    else openPhoto({ caption: ex.caption, locked: false, _img: IMAGES[ex.photo], photo: ex.photo });
   }
   function nextExhibit() { goToExhibit(galIdx + 1 >= room.exhibits.length ? 0 : galIdx + 1); }
   function prevExhibit() { goToExhibit(galIdx - 1 < 0 ? room.exhibits.length - 1 : galIdx - 1); }
@@ -767,7 +980,16 @@
 
   /* ----------------------------- LOOP -------------------------------- */
   let last = performance.now();
-  function frame(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now; update(dt, now); draw(now / 1000); requestAnimationFrame(frame); }
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    update(dt, now);
+    draw(now / 1000);
+    if (overlay === "photo" && activeMapCanvas) {
+      drawMapOnCanvas(activeMapCanvas);
+    }
+    requestAnimationFrame(frame);
+  }
 
   function tileLight(x, y) {
     const d = Math.hypot(x - player.rx, y - player.ry);
@@ -1187,6 +1409,50 @@
       });
     });
   })();
+
+  // ---- Clic direct sur le canvas de jeu pour interagir -----------------
+  canvas.addEventListener("click", (e) => {
+    if (mode !== "play" && mode !== "gallery" && mode !== "end") return;
+    if (overlay) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    
+    let closest = null;
+    let minDist = 40; // max click distance in pixels
+    
+    room.tiles.forEach(tile => {
+      if (tile.type !== "photo" && tile.type !== "glassdisp" && tile.type !== "panel") return;
+      const p = project(tile.x, tile.y);
+      let cx = p.x + (W / 2 - cam.x);
+      let cy = p.y + HH + (H * 0.58 - cam.y);
+      
+      if (tile.type === "photo") {
+        if (tile.hang) cy -= 211; // height adjustment for hanging photos
+        else cy -= 83; // height adjustment for normal photos
+      } else if (tile.type === "panel") {
+        cy -= 50; // height adjustment for signs
+      }
+      
+      const dist = Math.hypot(mx - cx, my - cy);
+      if (dist < minDist) {
+        minDist = dist;
+        closest = tile;
+      }
+    });
+    
+    if (closest) {
+      if (closest.type === "photo") openPhoto(closest);
+      else if (closest.type === "glassdisp") {
+        const gl = D.GLASSES[closest.glasses];
+        toast(collected.has(closest.glasses) ? (gl.name + " — débloquée. " + gl.pickup) : (gl.name + " — pas encore débloquée. Faut fouiller mieux."), collected.has(closest.glasses) ? "gold" : "sys");
+      }
+      else if (closest.type === "panel") {
+        if (!remy.following) toast("Sans guide, ces panneaux ? Du charabia crypté. Retrouve 0x52-EMI d'abord.", "sys");
+        else openPanel(closest.panel);
+      }
+    }
+  });
 
   resize(); requestAnimationFrame(frame); requestAnimationFrame(portraitLoop);
   window.GAME = { player, remy, giver, npcs, collected, coinsGot, tick: (n, dt) => { for (let i = 0; i < (n || 1); i++) update(dt || 0.016, performance.now()); draw(performance.now() / 1000); }, jump, step, goRoom, loadRoom, interact, enterGallery, nextExhibit, prevExhibit, get room() { return room; }, get mode() { return mode; }, get jumpUnlocked() { return jumpUnlocked; } };

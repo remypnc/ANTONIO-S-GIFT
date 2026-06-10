@@ -69,8 +69,8 @@ window.GAME_DATA = (function () {
     "photo_2026_05": "photos/ratatouille2026.jpg",
     "photo_2026_06": "photos/soiree2026.jpg",
     "photo_2026_07": "photos/train2026.jpg",
-    "toi_moi": "photos/toi-moi.heic",
-    "24ans": "photos/fun-end.heic",
+    "toi_moi": "photos/toi-moi.jpg",
+    "24ans": "photos/fun-end.jpg",
     "photo_final_01": "photos/bebe1.JPG",
     "photo_final_02": "photos/bebe2.JPG",
     "photo_final_03": "photos/bebe3.JPG",
@@ -881,12 +881,30 @@ window.GAME_DATA = (function () {
     const map = {};
     const put = (x, y, p) => { map[x + "," + y] = Object.assign(map[x + "," + y] || { x, y, depth: 4 }, p); };
     const glasses = Object.keys(GLASSES);
+
+    // Dynamically filter out duplicate photos from the gallery based on image path
+    const uniqueGalleryPhotos = [];
+    const seenImagePaths = new Set();
+    GALLERY_PHOTOS.forEach(gp => {
+      const photoId = gp[0];
+      const imgPath = PHOTO_PATHS[photoId];
+      if (imgPath) {
+        const lowerPath = imgPath.toLowerCase();
+        if (!seenImagePaths.has(lowerPath)) {
+          seenImagePaths.add(lowerPath);
+          uniqueGalleryPhotos.push(gp);
+        }
+      } else {
+        uniqueGalleryPhotos.push(gp);
+      }
+    });
+
     // contenu : carte, puis photos + lunettes entrelacées
     const items = [{ kind: "map" }];
     let pi = 0, gi = 0;
-    while (pi < GALLERY_PHOTOS.length || gi < glasses.length) {
-      if (pi < GALLERY_PHOTOS.length) items.push({ kind: "photo", photo: GALLERY_PHOTOS[pi][0], caption: GALLERY_PHOTOS[pi][1] }), pi++;
-      if (pi < GALLERY_PHOTOS.length) items.push({ kind: "photo", photo: GALLERY_PHOTOS[pi][0], caption: GALLERY_PHOTOS[pi][1] }), pi++;
+    while (pi < uniqueGalleryPhotos.length || gi < glasses.length) {
+      if (pi < uniqueGalleryPhotos.length) items.push({ kind: "photo", photo: uniqueGalleryPhotos[pi][0], caption: uniqueGalleryPhotos[pi][1] }), pi++;
+      if (pi < uniqueGalleryPhotos.length) items.push({ kind: "photo", photo: uniqueGalleryPhotos[pi][0], caption: uniqueGalleryPhotos[pi][1] }), pi++;
       if (gi < glasses.length) items.push({ kind: "glass", glasses: glasses[gi] }), gi++;
     }
     const startX = 2, step = 2, len = startX + items.length * step + 3;
