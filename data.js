@@ -728,7 +728,8 @@ window.GAME_DATA = (function () {
   ROOMS["2022"] = yearRoom({
     id: "2022", year: 2022, title: "2022 — L'année des dossiers",
     to: "2023", label: "2023", spawnPanel: "p_teleport", panel: "p_useless1", glassesPanel: "p_bridge", glasses: "g_thick", extraTele: "parkour",
-    photos: [["photo_2022_01", "Une photo que la justice devrait interdire."], ["dossier_2022", "Dossier classé."]],
+    photos: [["photo_2022_01", "Une photo que la justice devrait interdire."], ["photo_2022_02", "Dossier classé — Maxime."]],
+
     coins: 3,
     merchant: "g_thick",
     deco: [{ from: 0, dir: "up", gap: 4, w: 2, h: 2 }, { from: 0, dir: "up", gap: 8, w: 1, h: 1, off: 3, coin: true }],

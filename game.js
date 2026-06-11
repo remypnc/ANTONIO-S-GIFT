@@ -72,6 +72,11 @@
       if (t.phantom) { t._discovered = false; t.reveal = 0; }
       else if (t.hidden && !t._discovered) t.reveal = 0; else t.reveal = (t.reveal == null ? 1 : t.reveal);
     });
+    // Si le parkour de cette salle a déjà été réussi, restaurer le pont de retour
+    if (id === "parkour" && visited.has("pkDone")) {
+      pkDone = true;
+      room.tiles.forEach(t => { if (t.group === "pkret") { t._discovered = true; t.reveal = 1; } });
+    }
     // nombre de voisins -> silhouette d'île flottante (centre/côtés profonds, coins courts)
     room.tiles.forEach(t => {
       let n = 0;
@@ -202,7 +207,8 @@
     t.press = 1; spawnDust(player.x, player.y);
     if (t.crumble && !t._fallen && !(t._crumbleT > 0)) { t._crumbleT = 0.0001; remy.emote = "surprised"; toast("ÇA S'ÉCROULE ! Saute ailleurs, vite !"); }
     if (t.type === "reveal" && !pkDone) startParkour();
-    if (t.pkEndZone && pkOn && !pkDone) { pkDone = true; pkT = 0; revealGroup("pkret", true); remy.emote = "proud"; toast("PROPRE ! Un chemin de retour large s'ouvre. Parle au type là-bas pour la sortie."); }
+    if (t.pkEndZone && pkOn && !pkDone) { pkDone = true; pkT = 0; visited.add("pkDone"); revealGroup("pkret", true); remy.emote = "proud"; toast("PROPRE ! Un chemin de retour large s'ouvre. Parle au type là-bas pour la sortie."); }
+
     if (t.hidden && !t._discovered) revealSecret(t);
     if (t.coin && !coinsGot.has(t.x + "," + t.y)) collectCoin(t);
     if (t.type === "glasses" && t.glasses && !collected.has(t.glasses)) collectGlasses(t);
@@ -460,6 +466,10 @@
         }
         
         if (clickedNode) {
+          if (clickedNode.id === roomId) {
+            toast("Tu es déjà ici — parcours la galerie pour explorer !");
+            return;
+          }
           if (!isVisited(clickedNode.id)) {
             toast("Zone non encore foulée. Continue ton exploration !");
             return;
