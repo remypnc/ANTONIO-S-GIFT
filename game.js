@@ -221,7 +221,7 @@
     room.tiles.forEach(x => { if (x.group === grp) { x._discovered = on; x.reveal = on ? Math.max(0.001, x.reveal || 0) : 0; if (on && x.reveal == null) x.reveal = 0.001; } });
   }
   function startParkour() {
-    pkDone = false; pkOn = true; pkT = 15;
+    pkDone = false; pkOn = true; pkT = 12;
     revealGroup("pk", true);
     remy.emote = "smug"; toast("Chrono lancé ! Saute jusqu'à l'île d'en face AVANT la fin, ou tu tombes.");
   }

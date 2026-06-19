@@ -75,6 +75,11 @@ window.GAME_DATA = (function () {
     "photo_final_02": "photos/bebe2.JPG",
     "photo_final_03": "photos/bebe3.JPG",
     "photo_final_04": "photos/bebe5.JPG",
+    "photo_1712": "photos/1712915761122.JPG",
+    "photo_2023_07_18": "photos/20230718_163238.JPG",
+    "photo_2023_07_30": "photos/20230730_131418.JPG",
+    "photo_2024_10_29": "photos/20241029_211516.JPG",
+    "photo_peche_antoine": "photos/pech.jpgantoine-20240303-0002.JPG",
   };
 
   const GALLERY_PHOTOS = [
@@ -126,6 +131,11 @@ window.GAME_DATA = (function () {
     ["photo_2026_05", "2026. Ratatouille."],
     ["photo_2026_06", "2026. En soirée."],
     ["photo_2026_07", "2026. Dans le train."],
+    ["photo_1712", "Le dentiste le bien chaussé (ou le plus mal chaussé ? avec son bel appareil dentaire au travail)."],
+    ["photo_2023_07_18", "Le blédard au bled (au Vietnam)."],
+    ["photo_2023_07_30", "On ne saura jamais ce qui se passe par ta tête (mouchoir style)."],
+    ["photo_2024_10_29", "Sais-tu que tu es mignon, toi ?"],
+    ["photo_peche_antoine", "Ton péché mignon... Le Graal secret de cette galerie. 💕"],
     ["toi_moi", "Toi & moi. 8 ans au compteur, et ça continue."],
     ["24ans", "24 ans aujourd'hui. Joyeux anniversaire, frérot."],
   ];
@@ -856,18 +866,47 @@ window.GAME_DATA = (function () {
     // -- plateforme de DÉPART (3x3 solide, jamais rongée car en "blocks/features") --
     for (let x = 0; x <= 2; x++) for (let y = 0; y <= 2; y++) f.push({ at: [x, y], depth: 6 });
     f.push({ at: [2, 1], type: "reveal" });                       // case ROUGE = lance le chrono
+
     // -- pierres de saut : apparaissent au chrono, et RESTENT en place après réussite --
-    f.push({ at: [5, 1], phantom: true, group: "pk", depth: 6, hidden: true });
-    f.push({ at: [8, 1], phantom: true, group: "pk", depth: 6, hidden: true });
-    // -- grande plateforme d'ARRIVÉE, ÉQUILIBRÉE autour du bonhomme [12,1] (5x5 solide) --
-    for (let x = 11; x <= 15; x++) for (let y = -1; y <= 3; y++) f.push({ at: [x, y], depth: 6, pkEndZone: true });
-    f.push({ at: [12, 1], npc: "clochard", npcColor: "#8c96ff" });
-    f.push({ at: [13, 1], type: "teleport", to: "2023", label: "OK", needTalk: true });
+    // Chemin sinueux :
+    // saut 1 de [2,1] à [6,1] (longueur 4, direction down)
+    f.push({ at: [6, 1], phantom: true, group: "pk", depth: 6, hidden: true });
+    // saut 2 de [6,1] à [6,5] (longueur 4, direction left)
+    f.push({ at: [6, 5], phantom: true, group: "pk", depth: 6, hidden: true });
+    // saut 3 de [6,5] à [10,5] (longueur 4, direction down)
+    f.push({ at: [10, 5], phantom: true, group: "pk", depth: 6, hidden: true });
+    // saut 4 de [10,5] à [10,1] (longueur 4, direction right)
+    f.push({ at: [10, 1], phantom: true, group: "pk", depth: 6, hidden: true });
+    // saut 5 de [10,1] à [13,1] (longueur 3, direction down - atterrit dans l'EndZone)
+
+    // -- grande plateforme d'ARRIVÉE, ÉQUILIBRÉE autour du bonhomme [14,1] (5x5 solide) --
+    for (let x = 13; x <= 17; x++) for (let y = -1; y <= 3; y++) f.push({ at: [x, y], depth: 6, pkEndZone: true });
+    f.push({ at: [14, 1], npc: "clochard", npcColor: "#8c96ff" });
+    f.push({ at: [15, 1], type: "teleport", to: "2023", label: "OK", needTalk: true });
+
     // -- pont de RETOUR : comble les trous entre les pierres, révélé à la réussite --
-    for (let x = 3; x <= 10; x++) for (let y = 0; y <= 2; y++) {
-      if ((x === 5 || x === 8) && y === 1) continue;             // garde les pierres de saut
-      f.push({ at: [x, y], retBridge: true, hidden: true, group: "pkret", depth: 6 });
-    }
+    const pkStones = new Set(["6,1", "6,5", "10,5", "10,1"]);
+    const bridgeTiles = [];
+    
+    // Chemin horizontal de retour x=3..6, y=1 (largeur 3, y=0..2)
+    for (let x = 3; x <= 6; x++) for (let y = 0; y <= 2; y++) bridgeTiles.push([x, y]);
+    // Liaison verticale x=6, y=2..4
+    for (let x = 5; x <= 7; x++) for (let y = 2; y <= 4; y++) bridgeTiles.push([x, y]);
+    // Liaison horizontale x=7..10, y=5
+    for (let x = 7; x <= 10; x++) for (let y = 4; y <= 6; y++) bridgeTiles.push([x, y]);
+    // Liaison verticale x=10, y=2..4
+    for (let x = 9; x <= 11; x++) for (let y = 2; y <= 4; y++) bridgeTiles.push([x, y]);
+    // Liaison finale vers l'EndZone x=11..12, y=1
+    for (let x = 11; x <= 12; x++) for (let y = 0; y <= 2; y++) bridgeTiles.push([x, y]);
+
+    const added = new Set();
+    bridgeTiles.forEach(([bx, by]) => {
+      const key = bx + "," + by;
+      if (pkStones.has(key) || added.has(key)) return;
+      added.add(key);
+      f.push({ at: [bx, by], retBridge: true, hidden: true, group: "pkret", depth: 6 });
+    });
+
     return buildRoom({
       id: "parkour", year: "P", title: "Salle du Parkour — case rouge = chrono", bright: false,
       entry: [1, 1], islands: [], features: f,
